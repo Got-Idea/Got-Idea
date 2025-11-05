@@ -22,12 +22,14 @@ const Auth = () => {
     // Check if user is already logged in
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
+        console.log("User already logged in, redirecting to workspace");
         navigate("/workspace");
       }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+      console.log("Auth state changed:", event, session ? "Session exists" : "No session");
+      if (event === 'SIGNED_IN' && session) {
         navigate("/workspace");
       }
     });
@@ -77,17 +79,41 @@ const Auth = () => {
   }, []);
 
   const handleOAuthSignIn = async (provider: 'github' | 'google') => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: `${window.location.origin}/workspace`
-      }
-    });
+    try {
+      console.log(`Initiating ${provider} OAuth sign in`);
+      const redirectUrl = `${window.location.origin}/workspace`;
+      console.log("Redirect URL:", redirectUrl);
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: provider === 'google' ? {
+            access_type: 'offline',
+            prompt: 'consent',
+          } : undefined
+        }
+      });
 
-    if (error) {
+      if (error) {
+        console.error("OAuth error:", error);
+        toast({
+          title: "Authentication Error",
+          description: error.message,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (data?.url) {
+        console.log("Redirecting to OAuth provider");
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error("Unexpected OAuth error:", error);
       toast({
-        title: "Authentication Error",
-        description: error.message,
+        title: "Error",
+        description: "An unexpected error occurred during sign in",
         variant: "destructive"
       });
     }

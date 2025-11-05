@@ -3,10 +3,15 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Key, CheckCircle, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { Key, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 const Settings = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [apiKeys, setApiKeys] = useState({
     openai: "",
     anthropic: "",
@@ -19,10 +24,54 @@ const Settings = () => {
     gemini: false,
   });
 
+  useEffect(() => {
+    if (!loading && !user) {
+      toast.error("Please sign in to access settings");
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  useEffect(() => {
+    // Load saved API keys from localStorage
+    const savedKeys = localStorage.getItem("api_keys");
+    if (savedKeys) {
+      try {
+        setApiKeys(JSON.parse(savedKeys));
+      } catch (e) {
+        console.error("Failed to load API keys", e);
+      }
+    }
+  }, []);
+
+  const handleSave = () => {
+    localStorage.setItem("api_keys", JSON.stringify(apiKeys));
+    toast.success("Settings saved successfully!");
+  };
+
+  const handleReset = () => {
+    setApiKeys({ openai: "", anthropic: "", gemini: "" });
+    setValidated({ openai: false, anthropic: false, gemini: false });
+    localStorage.removeItem("api_keys");
+    toast.success("Settings reset successfully!");
+  };
+
   const handleValidate = (provider: string) => {
     // Mock validation
     setValidated({ ...validated, [provider]: true });
+    toast.success(`${provider.charAt(0).toUpperCase() + provider.slice(1)} API key validated!`);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -184,8 +233,8 @@ const Settings = () => {
               </div>
 
               <div className="flex gap-3">
-                <Button className="shadow-paper">Save Settings</Button>
-                <Button variant="outline" className="shadow-paper">
+                <Button className="shadow-paper" onClick={handleSave}>Save Settings</Button>
+                <Button variant="outline" className="shadow-paper" onClick={handleReset}>
                   Reset All
                 </Button>
               </div>

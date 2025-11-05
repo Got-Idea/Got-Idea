@@ -1,9 +1,12 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
+import { Sparkles, LogOut, User } from "lucide-react";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
+  const { user, signOut } = useAuth();
+
   return (
     <motion.nav
       initial={{ y: -20, opacity: 0 }}
@@ -34,16 +37,35 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Link to="/auth">
-              <Button variant="ghost" size="sm">
-                Sign In
-              </Button>
-            </Link>
-            <Link to="/auth">
-              <Button size="sm" className="shadow-paper hover:shadow-paper-lg transition-all">
-                Get Started
-              </Button>
-            </Link>
+            {user ? (
+              <>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="w-4 h-4" />
+                  <span className="hidden sm:inline">{user.email}</span>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={signOut}
+                >
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Sign Out
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link to="/auth">
+                  <Button variant="ghost" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+                <Link to="/auth">
+                  <Button size="sm" className="shadow-paper hover:shadow-paper-lg transition-all">
+                    Get Started
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

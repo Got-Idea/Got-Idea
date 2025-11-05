@@ -1,12 +1,156 @@
 import Navbar from "@/components/Navbar";
+import CodeEditor from "@/components/CodeEditor";
+import AIPromptPanel from "@/components/AIPromptPanel";
+import LivePreview from "@/components/LivePreview";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Play, Settings, Download, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { Play, Settings, Download, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Workspace = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
+  const [generatedCode, setGeneratedCode] = useState("");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      toast.error("Please sign in to access the workspace");
+      navigate("/auth");
+    }
+  }, [user, loading, navigate]);
+
+  const generateCode = async () => {
+    if (!prompt.trim()) {
+      toast.error("Please enter a description");
+      return;
+    }
+
+    // Get API keys from localStorage
+    const apiKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
+    const openaiKey = apiKeys.openai;
+    const anthropicKey = apiKeys.anthropic;
+    const geminiKey = apiKeys.gemini;
+
+    // Determine which provider to use (priority: OpenAI > Anthropic > Gemini)
+    let apiKey = '';
+    let provider = '';
+    
+    if (openaiKey) {
+      apiKey = openaiKey;
+      provider = 'openai';
+    } else if (anthropicKey) {
+      apiKey = anthropicKey;
+      provider = 'anthropic';
+    } else if (geminiKey) {
+      apiKey = geminiKey;
+      provider = 'gemini';
+    }
+
+    if (!apiKey) {
+      toast.error("Please add your API key in Settings first");
+      navigate("/settings");
+      return;
+    }
+
+    setIsGenerating(true);
+    setGeneratedCode("");
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        toast.error("Please sign in to generate code");
+        navigate("/auth");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-code`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ prompt, apiKey, provider }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Failed to generate code" }));
+        throw new Error(errorData.error || "Failed to generate code");
+      }
+
+      if (!response.body) {
+        throw new Error("No response body received");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+      let streamDone = false;
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") {
+            streamDone = true;
+            break;
+          }
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) {
+              setGeneratedCode((prev) => prev + content);
+            }
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+
+      toast.success("Code generated successfully!");
+    } catch (error) {
+      console.error("Error generating code:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate code");
+      setGeneratedCode("");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -23,7 +167,7 @@ const Workspace = () => {
             <span className="text-sm font-medium text-muted-foreground">Untitled Project</span>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </Button>
@@ -45,56 +189,13 @@ const Workspace = () => {
             initial={{ x: -50, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="w-80 border-r border-border bg-muted/20 p-6 space-y-4 overflow-y-auto"
           >
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-primary" />
-                <h3 className="font-semibold">AI Assistant</h3>
-              </div>
-              
-              <Textarea
-                placeholder="Describe what you want to build... 
-
-Example: Create a portfolio website with a 3D papercraft theme and contact form"
-                className="min-h-[200px] resize-none shadow-paper"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
-              
-              <Button className="w-full shadow-paper">
-                <Sparkles className="w-4 h-4 mr-2" />
-                Generate Code
-              </Button>
-            </div>
-
-            <div className="paper-card p-4 space-y-2">
-              <h4 className="text-sm font-semibold">Quick Actions</h4>
-              <div className="space-y-2">
-                <button className="w-full text-left text-sm p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                  Add Navigation
-                </button>
-                <button className="w-full text-left text-sm p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                  Create Hero Section
-                </button>
-                <button className="w-full text-left text-sm p-2 rounded-lg hover:bg-muted/50 transition-colors">
-                  Add Contact Form
-                </button>
-              </div>
-            </div>
-
-            <div className="paper-card p-4 space-y-2 bg-primary/5 border border-primary/20">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Settings className="w-4 h-4" />
-                API Configuration
-              </h4>
-              <p className="text-xs text-muted-foreground">
-                Configure your API keys in Settings to enable AI features
-              </p>
-              <Button variant="outline" size="sm" className="w-full">
-                Go to Settings
-              </Button>
-            </div>
+            <AIPromptPanel
+              prompt={prompt}
+              setPrompt={setPrompt}
+              isGenerating={isGenerating}
+              onGenerate={generateCode}
+            />
           </motion.div>
 
           {/* Editor & Preview Split */}
@@ -104,23 +205,8 @@ Example: Create a portfolio website with a 3D papercraft theme and contact form"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3 }}
-              className="flex-1 border-b border-border bg-background p-6 overflow-auto"
             >
-              <div className="paper-card p-6 h-full font-mono text-sm">
-                <div className="text-muted-foreground">
-                  <span className="text-primary">{"<div"}</span>
-                  {" className="}
-                  <span className="text-secondary">"container"</span>
-                  {">"}<br />
-                  {"  "}<span className="text-primary">{"<h1>"}</span>
-                  Welcome to Got Idea
-                  <span className="text-primary">{"</h1>"}</span><br />
-                  {"  "}<span className="text-primary">{"<p>"}</span>
-                  Start building with AI...
-                  <span className="text-primary">{"</p>"}</span><br />
-                  <span className="text-primary">{"</div>"}</span>
-                </div>
-              </div>
+              <CodeEditor code={generatedCode} />
             </motion.div>
 
             {/* Live Preview */}
@@ -128,19 +214,8 @@ Example: Create a portfolio website with a 3D papercraft theme and contact form"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="flex-1 bg-muted/30 p-6 overflow-auto"
             >
-              <div className="paper-card p-12 h-full flex items-center justify-center">
-                <div className="text-center space-y-4">
-                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto shadow-paper">
-                    <Sparkles className="w-8 h-8 text-primary" />
-                  </div>
-                  <h2 className="text-2xl font-bold">Live Preview</h2>
-                  <p className="text-muted-foreground max-w-md">
-                    Your generated website will appear here in real-time as you build with AI
-                  </p>
-                </div>
-              </div>
+              <LivePreview />
             </motion.div>
           </div>
         </div>
