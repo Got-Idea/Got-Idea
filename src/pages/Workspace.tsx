@@ -2,28 +2,58 @@ import Navbar from "@/components/Navbar";
 import CodeEditor from "@/components/CodeEditor";
 import AIPromptPanel from "@/components/AIPromptPanel";
 import LivePreview from "@/components/LivePreview";
+import TemplateSelector from "@/components/TemplateSelector";
+import FileExplorer from "@/components/FileExplorer";
+import LoadingOverlay from "@/components/LoadingOverlay";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Play, Settings, Download, Loader2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Settings, Download, FileCode, Save, FolderOpen, Code, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import JSZip from "jszip";
+
+interface ProjectFile {
+  name: string;
+  content: string;
+}
+
+interface SavedProject {
+  title: string;
+  files: ProjectFile[];
+  prompt: string;
+  savedAt: string;
+}
 
 const Workspace = () => {
-  const { user, loading } = useAuth();
   const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
-  const [generatedCode, setGeneratedCode] = useState("");
+  const [files, setFiles] = useState<ProjectFile[]>([]);
+  const [activeFile, setActiveFile] = useState<string>("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [projectTitle, setProjectTitle] = useState("Untitled Project");
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("code");
 
+  // Load saved projects from localStorage on mount
   useEffect(() => {
-    if (!loading && !user) {
-      toast.error("Please sign in to access the workspace");
-      navigate("/auth");
+    const saved = localStorage.getItem('savedProjects');
+    if (saved) {
+      setSavedProjects(JSON.parse(saved));
     }
-  }, [user, loading, navigate]);
+  }, []);
+
+  const handleTemplateSelect = (code: string, title: string) => {
+    setFiles([{ name: 'index.html', content: code }]);
+    setActiveFile('index.html');
+    setProjectTitle(title);
+    setShowTemplates(false);
+    toast.success(`${title} template loaded!`);
+  };
 
   const generateCode = async () => {
     if (!prompt.trim()) {
@@ -31,54 +61,24 @@ const Workspace = () => {
       return;
     }
 
-    // Get API keys from localStorage
-    const apiKeys = JSON.parse(localStorage.getItem('apiKeys') || '{}');
-    const openaiKey = apiKeys.openai;
-    const anthropicKey = apiKeys.anthropic;
-    const geminiKey = apiKeys.gemini;
-
-    // Determine which provider to use (priority: OpenAI > Anthropic > Gemini)
-    let apiKey = '';
-    let provider = '';
-    
-    if (openaiKey) {
-      apiKey = openaiKey;
-      provider = 'openai';
-    } else if (anthropicKey) {
-      apiKey = anthropicKey;
-      provider = 'anthropic';
-    } else if (geminiKey) {
-      apiKey = geminiKey;
-      provider = 'gemini';
-    }
-
-    if (!apiKey) {
-      toast.error("Please add your API key in Settings first");
-      navigate("/settings");
-      return;
-    }
-
     setIsGenerating(true);
-    setGeneratedCode("");
+    setFiles([]);
+    setActiveFile("");
+    setActiveTab("preview");
+    
+    if (!projectTitle || projectTitle === "Untitled Project") {
+      setProjectTitle(prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''));
+    }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        toast.error("Please sign in to generate code");
-        navigate("/auth");
-        return;
-      }
-
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-code`,
+        `https://aqlxrasequxshncrlfer.supabase.co/functions/v1/generate-code`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ prompt, apiKey, provider }),
+          body: JSON.stringify({ prompt }),
         }
       );
 
@@ -95,11 +95,14 @@ const Workspace = () => {
       const decoder = new TextDecoder();
       let textBuffer = "";
       let streamDone = false;
+      let fullHtmlContent = "";
 
       while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
-        textBuffer += decoder.decode(value, { stream: true });
+        
+        const chunk = decoder.decode(value, { stream: true });
+        textBuffer += chunk;
 
         let newlineIndex: number;
         while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
@@ -118,11 +121,19 @@ const Workspace = () => {
 
           try {
             const parsed = JSON.parse(jsonStr);
-            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            const content = parsed.candidates?.[0]?.content?.parts?.[0]?.text as string | undefined;
+            
             if (content) {
-              setGeneratedCode((prev) => prev + content);
+              fullHtmlContent += content;
+              
+              // Update single HTML file in real-time
+              setFiles([{ name: 'index.html', content: fullHtmlContent }]);
+              if (!activeFile) {
+                setActiveFile('index.html');
+              }
             }
-          } catch {
+          } catch (e) {
+            console.error('Parse error:', e);
             textBuffer = line + "\n" + textBuffer;
             break;
           }
@@ -133,27 +144,102 @@ const Workspace = () => {
     } catch (error) {
       console.error("Error generating code:", error);
       toast.error(error instanceof Error ? error.message : "Failed to generate code");
-      setGeneratedCode("");
+      setFiles([]);
     } finally {
       setIsGenerating(false);
     }
   };
 
+  const saveProject = () => {
+    if (files.length === 0) {
+      toast.error("No code to save");
+      return;
+    }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+    const newProject: SavedProject = {
+      title: projectTitle,
+      files: files,
+      prompt: prompt,
+      savedAt: new Date().toISOString()
+    };
 
-  if (!user) {
-    return null;
-  }
+    const updated = [...savedProjects, newProject];
+    setSavedProjects(updated);
+    localStorage.setItem('savedProjects', JSON.stringify(updated));
+    toast.success("Project saved successfully!");
+  };
+
+  const loadProject = (project: SavedProject) => {
+    setProjectTitle(project.title);
+    setFiles(project.files);
+    setActiveFile(project.files[0]?.name || "");
+    setPrompt(project.prompt);
+    setShowLoadDialog(false);
+    toast.success("Project loaded successfully!");
+  };
+
+  const deleteProject = (index: number) => {
+    const updated = savedProjects.filter((_, i) => i !== index);
+    setSavedProjects(updated);
+    localStorage.setItem('savedProjects', JSON.stringify(updated));
+    toast.success("Project deleted!");
+  };
+
+  const exportAsZip = async () => {
+    if (files.length === 0) {
+      toast.error("No code to export");
+      return;
+    }
+
+    const zip = new JSZip();
+    
+    // Add all files to zip
+    files.forEach(file => {
+      zip.file(file.name, file.content);
+    });
+
+    zip.file("package.json", JSON.stringify({
+      "name": "got-idea-project",
+      "version": "1.0.0",
+      "description": "Generated by Got Idea",
+      "main": "index.html",
+      "scripts": {
+        "start": "vite",
+        "build": "vite build"
+      },
+      "dependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+      },
+      "devDependencies": {
+        "vite": "^5.0.0",
+        "@vitejs/plugin-react": "^4.2.0"
+      }
+    }, null, 2));
+
+    zip.file("README.md", `# Got Idea Project\n\nGenerated with Got Idea AI\n\n## Setup\n\`\`\`bash\nnpm install\nnpm start\n\`\`\``);
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${projectTitle.replace(/\s+/g, '-').toLowerCase()}.zip`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast.success("Project exported successfully!");
+  };
+
+  const currentFile = files.find(f => f.name === activeFile);
+  const handleCodeChange = (newCode: string) => {
+    setFiles(files.map(f => 
+      f.name === activeFile ? { ...f, content: newCode } : f
+    ));
+  };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      {isGenerating && <LoadingOverlay />}
       <Navbar />
       
       <div className="pt-20 h-screen flex flex-col">
@@ -164,20 +250,67 @@ const Workspace = () => {
           className="border-b border-border bg-background/50 backdrop-blur-sm px-6 py-3 flex items-center justify-between"
         >
           <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-muted-foreground">Untitled Project</span>
+            <span className="text-sm font-medium text-muted-foreground">{projectTitle}</span>
           </div>
           <div className="flex items-center gap-2">
+            <Dialog open={showTemplates} onOpenChange={setShowTemplates}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FileCode className="w-4 h-4 mr-2" />
+                  Templates
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl">
+                <DialogHeader>
+                  <DialogTitle>Choose a Template</DialogTitle>
+                </DialogHeader>
+                <TemplateSelector onSelectTemplate={handleTemplateSelect} />
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline" size="sm" onClick={saveProject} disabled={files.length === 0}>
+              <Save className="w-4 h-4 mr-2" />
+              Save
+            </Button>
+            <Dialog open={showLoadDialog} onOpenChange={setShowLoadDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FolderOpen className="w-4 h-4 mr-2" />
+                  Load
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Load Project</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-96 overflow-y-auto space-y-2">
+                  {savedProjects.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-8">No saved projects yet</p>
+                  ) : (
+                    savedProjects.map((project, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent">
+                        <div className="flex-1">
+                          <h3 className="font-medium">{project.title}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Saved {new Date(project.savedAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => loadProject(project)}>Load</Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteProject(index)}>Delete</Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
             <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
               <Settings className="w-4 h-4 mr-2" />
               Settings
             </Button>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={exportAsZip} disabled={files.length === 0}>
               <Download className="w-4 h-4 mr-2" />
               Export
-            </Button>
-            <Button size="sm" className="shadow-paper">
-              <Play className="w-4 h-4 mr-2" />
-              Deploy
             </Button>
           </div>
         </motion.div>
@@ -198,25 +331,50 @@ const Workspace = () => {
             />
           </motion.div>
 
-          {/* Editor & Preview Split */}
-          <div className="flex-1 flex flex-col">
-            {/* Code Editor */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
-            >
-              <CodeEditor code={generatedCode} />
-            </motion.div>
+          {/* Code & Preview with File Explorer */}
+          <div className="flex-1 flex flex-col pointer-events-auto">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+              <TabsList className="w-full justify-start rounded-none border-b bg-[#2d2d30] border-[#3e3e42] px-6 pointer-events-auto">
+                <TabsTrigger value="code" className="gap-2 data-[state=active]:bg-[#1e1e1e] data-[state=active]:text-[#cccccc] text-[#858585] cursor-pointer pointer-events-auto">
+                  <Code className="w-4 h-4" />
+                  Code
+                </TabsTrigger>
+                <TabsTrigger value="preview" className="gap-2 data-[state=active]:bg-[#1e1e1e] data-[state=active]:text-[#cccccc] text-[#858585] cursor-pointer pointer-events-auto">
+                  <Eye className="w-4 h-4" />
+                  Preview
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="code" className="flex-1 m-0 overflow-auto flex">
+                <FileExplorer 
+                  files={files} 
+                  activeFile={activeFile}
+                  onFileSelect={setActiveFile}
+                />
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="flex-1"
+                >
+                  <CodeEditor 
+                    code={currentFile?.content || ""} 
+                    onCodeChange={handleCodeChange} 
+                  />
+                </motion.div>
+              </TabsContent>
 
-            {/* Live Preview */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.4 }}
-            >
-              <LivePreview />
-            </motion.div>
+              <TabsContent value="preview" className="flex-1 m-0 overflow-auto bg-[#1e1e1e]">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                  className="h-full"
+                >
+                  <LivePreview files={files} />
+                </motion.div>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>

@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Sparkles, LogOut, User } from "lucide-react";
+import { Sparkles, Moon, Sun } from "lucide-react";
 import { motion } from "framer-motion";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const Navbar = () => {
-  const { user, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <motion.nav
@@ -37,35 +37,23 @@ const Navbar = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {user ? (
-              <>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <User className="w-4 h-4" />
-                  <span className="hidden sm:inline">{user.email}</span>
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={signOut}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sign Out
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link to="/auth">
-                  <Button variant="ghost" size="sm">
-                    Sign In
-                  </Button>
-                </Link>
-                <Link to="/auth">
-                  <Button size="sm" className="shadow-paper hover:shadow-paper-lg transition-all">
-                    Get Started
-                  </Button>
-                </Link>
-              </>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleTheme}
+              className="hover:bg-accent transition-colors"
+            >
+              {theme === 'light' ? (
+                <Moon className="w-4 h-4" />
+              ) : (
+                <Sun className="w-4 h-4" />
+              )}
+            </Button>
+            <Link to="/workspace">
+              <Button size="sm" className="shadow-paper hover:shadow-paper-lg transition-all">
+                Get Started
+              </Button>
+            </Link>
           </div>
         </div>
       </div>
