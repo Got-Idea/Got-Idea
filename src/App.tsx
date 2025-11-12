@@ -18,11 +18,15 @@ export default function App() {
   const [anthropicApiKey, setAnthropicApiKey] = useLocalStorage<string | null>('gotidea-anthropic-apikey', null);
   const activeApiKey = provider === 'gemini' ? geminiApiKey : anthropicApiKey;
   
-  // Supabase Config
-  const [supabaseUrl, setSupabaseUrl] = useLocalStorage<string | null>('gotidea-supabase-url', 'https://aqlxrasequxshncrlfer.supabase.co');
-  const [supabaseAnonKey, setSupabaseAnonKey] = useLocalStorage<string | null>('gotidea-supabase-anon-key', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbHhyYXNlcXV4c2huY3JsZmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3NjA5MjMsImV4cCI6MjA3NzMzNjkyM30.wJZfTjfaFD-9H5CffEo5UQnur4cXDGNzQLUE8lK11f8');
+  // Supabase Config for "Got Idea" App (project saving, auth)
+  const supabaseUrl = 'https://aqlxrasequxshncrlfer.supabase.co';
+  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFxbHhyYXNlcXV4c2huY3JsZmVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3NjA5MjMsImV4cCI6MjA3NzMzNjkyM30.wJZfTjfaFD-9H5CffEo5UQnur4cXDGNzQLUE8lK11f8';
   const [supabase, setSupabase] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+
+  // User's Supabase Config (for generated apps)
+  const [userSupabaseUrl, setUserSupabaseUrl] = useLocalStorage<string | null>('gotidea-user-supabase-url', null);
+  const [userSupabaseAnonKey, setUserSupabaseAnonKey] = useLocalStorage<string | null>('gotidea-user-supabase-key', null);
 
   // UI State
   const [theme, setTheme] = useLocalStorage<'light' | 'dark'>('gotidea-theme', 'dark');
@@ -51,18 +55,18 @@ export default function App() {
   useEffect(() => { document.documentElement.classList.toggle('dark', theme === 'dark'); }, [theme]);
   const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
 
-  const handleSaveApiConfig = (config: { 
+  const handleSaveSettings = (config: { 
     provider: AiProvider; 
     geminiKey: string; 
     anthropicKey:string;
-    supabaseUrl: string;
-    supabaseAnonKey: string;
+    userSupabaseUrl: string;
+    userSupabaseAnonKey: string;
   }) => {
     setProvider(config.provider);
     setGeminiApiKey(config.geminiKey || null);
     setAnthropicApiKey(config.anthropicKey || null);
-    setSupabaseUrl(config.supabaseUrl || null);
-    setSupabaseAnonKey(config.supabaseAnonKey || null);
+    setUserSupabaseUrl(config.userSupabaseUrl || null);
+    setUserSupabaseAnonKey(config.userSupabaseAnonKey || null);
   };
 
   const handleNavigation = (page: Page) => {
@@ -75,8 +79,7 @@ export default function App() {
   
   const openSignInModal = () => {
     if (!supabase) {
-        alert("Supabase is not configured. Please add the URL and Key in Settings.");
-        handleNavigation('settings');
+        alert("Supabase is not configured for this project.");
         return;
     }
     setIsSignInModalOpen(true);
@@ -108,20 +111,27 @@ export default function App() {
         case 'landing':
             return <LandingPage onNavigate={handleNavigation} />;
         case 'workspace':
-            return <Workspace provider={provider} activeApiKey={activeApiKey} supabase={supabase} user={session?.user ?? null} />;
+            return <Workspace 
+                provider={provider} 
+                activeApiKey={activeApiKey} 
+                supabase={supabase} 
+                user={session?.user ?? null}
+                userSupabaseUrl={userSupabaseUrl}
+                userSupabaseAnonKey={userSupabaseAnonKey}
+            />;
         case 'docs':
             return <DocsPage />;
         case 'about':
             return <AboutPage />;
         case 'settings':
             return <SettingsPage 
-                onSave={handleSaveApiConfig} 
+                onSave={handleSaveSettings} 
                 onClose={() => setActivePage(activeApiKey ? 'workspace' : 'landing')}
                 currentProvider={provider}
                 currentGeminiKey={geminiApiKey}
                 currentAnthropicKey={anthropicApiKey}
-                currentSupabaseUrl={supabaseUrl}
-                currentSupabaseAnonKey={supabaseAnonKey}
+                currentUserSupabaseUrl={userSupabaseUrl}
+                currentUserSupabaseAnonKey={userSupabaseAnonKey}
             />;
         default:
             return <LandingPage onNavigate={handleNavigation} />;
