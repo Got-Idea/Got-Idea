@@ -1,4 +1,4 @@
-export type AiProvider = 'gemini' | 'anthropic';
+export type AiProvider = 'gemini' | 'anthropic' | 'openai' | 'openrouter';
 export type Page = 'landing' | 'workspace' | 'docs' | 'settings' | 'about';
 export type Message = {
     role: 'user' | 'assistant';

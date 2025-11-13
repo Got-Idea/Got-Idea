@@ -16,7 +16,15 @@ export default function App() {
   const [provider, setProvider] = useLocalStorage<AiProvider>('gotidea-provider', 'gemini');
   const [geminiApiKey, setGeminiApiKey] = useLocalStorage<string | null>('gotidea-gemini-apikey', null);
   const [anthropicApiKey, setAnthropicApiKey] = useLocalStorage<string | null>('gotidea-anthropic-apikey', null);
-  const activeApiKey = provider === 'gemini' ? geminiApiKey : anthropicApiKey;
+  const [openAiKey, setOpenAiKey] = useLocalStorage<string | null>('gotidea-openai-apikey', null);
+  const [openRouterKey, setOpenRouterKey] = useLocalStorage<string | null>('gotidea-openrouter-apikey', null);
+
+  const activeApiKey = {
+    'gemini': geminiApiKey,
+    'anthropic': anthropicApiKey,
+    'openai': openAiKey,
+    'openrouter': openRouterKey
+  }[provider];
   
   // Supabase Config for "Got Idea" App (project saving, auth)
   const supabaseUrl = 'https://aqlxrasequxshncrlfer.supabase.co';
@@ -59,12 +67,16 @@ export default function App() {
     provider: AiProvider; 
     geminiKey: string; 
     anthropicKey:string;
+    openAiKey: string;
+    openRouterKey: string;
     userSupabaseUrl: string;
     userSupabaseAnonKey: string;
   }) => {
     setProvider(config.provider);
     setGeminiApiKey(config.geminiKey || null);
     setAnthropicApiKey(config.anthropicKey || null);
+    setOpenAiKey(config.openAiKey || null);
+    setOpenRouterKey(config.openRouterKey || null);
     setUserSupabaseUrl(config.userSupabaseUrl || null);
     setUserSupabaseAnonKey(config.userSupabaseAnonKey || null);
   };
@@ -113,7 +125,7 @@ export default function App() {
         case 'workspace':
             return <Workspace 
                 provider={provider} 
-                activeApiKey={activeApiKey} 
+                activeApiKey={activeApiKey ?? null} 
                 supabase={supabase} 
                 user={session?.user ?? null}
                 userSupabaseUrl={userSupabaseUrl}
@@ -130,6 +142,8 @@ export default function App() {
                 currentProvider={provider}
                 currentGeminiKey={geminiApiKey}
                 currentAnthropicKey={anthropicApiKey}
+                currentOpenAiKey={openAiKey}
+                currentOpenRouterKey={openRouterKey}
                 currentUserSupabaseUrl={userSupabaseUrl}
                 currentUserSupabaseAnonKey={userSupabaseAnonKey}
             />;

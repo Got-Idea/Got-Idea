@@ -8,7 +8,7 @@ import LoadingOverlay from '../workspace/LoadingOverlay';
 import ResponsiveToolbar, { Device } from '../workspace/ResponsiveToolbar';
 import VercelDeployModal from '../workspace/VercelDeployModal';
 import GitHubDeployModal from '../workspace/GitHubDeployModal';
-import { XIcon, HistoryIcon, FilePlusIcon, SaveIcon, CaseIcon, GitHubIcon } from '../Icons';
+import { XIcon, HistoryIcon, FilePlusIcon, SaveIcon, CaseIcon, GitHubIcon, UserIcon } from '../Icons';
 import ChatHistory from '../workspace/ChatHistory';
 import ChatInput from '../workspace/ChatInput';
 import { SupabaseClient, User } from '@supabase/supabase-js';
@@ -92,10 +92,36 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
     const [isNewProjectConfirmOpen, setIsNewProjectConfirmOpen] = useState(false);
     const [isProjectsModalOpen, setIsProjectsModalOpen] = useState(false);
 
+    const parseErrorMessage = (error: Error): string => {
+        const message = error.message.toLowerCase();
+
+        if (message.includes('api key not valid') || message.includes('invalid api key')) {
+            return "It seems your API key is invalid. Please double-check it in the Settings page. You can get a new key from your AI provider's dashboard.";
+        }
+        if (message.includes('rate limit')) {
+            return "You've hit the API rate limit. Please wait a bit before sending another request. Check your usage plan with your AI provider if this continues.";
+        }
+        if (message.includes('billing') || message.includes('quota')) {
+            return "There might be an issue with your API key's billing or quota. Please visit your AI provider's dashboard to ensure your account is in good standing.";
+        }
+        if (message.includes('blocked') || message.includes('safety')) {
+            return "The request was blocked due to safety settings. Please try rephrasing your prompt to be more compliant with the AI's safety policy.";
+        }
+        if (message.includes('failed to fetch')) {
+             return "Could not connect to the AI service. Please check your internet connection and try again.";
+        }
+
+        // Generic fallback
+        return `An unexpected error occurred. This can sometimes happen with very complex requests. You could try simplifying your prompt.\n\nOriginal error: ${error.message}`;
+    };
 
     const handleSendMessage = useCallback(async (newMessage: string) => {
         if (!activeApiKey) {
             setError('API key is not set. Please add it in Settings.');
+            return;
+        }
+        if (!user) {
+            setError('Please sign in to start creating. Signing in allows you to save your projects.');
             return;
         }
         
@@ -107,7 +133,7 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
         setIsHistoryOpen(false);
 
         try {
-            const codeToModify = currentVersionIndex > -1 ? codeHistory[currentVersionIndex] : undefined;
+            const codeToModify = generatedCode || undefined;
             const code = await generateWebsiteCode(newMessage, provider, activeApiKey, codeToModify, userSupabaseUrl, userSupabaseAnonKey);
             
             const newHistory = [...codeHistory.slice(0, currentVersionIndex + 1), code];
@@ -119,13 +145,13 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
             setMessages(prev => [...prev, { role: 'assistant', content: `I've updated the website and created Version ${newVersionIndex + 1}. What's next?`, version: newVersionIndex + 1, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
             setHasUnsavedChanges(true);
         } catch (err: any) {
-            const errorMessage = err.message || 'An unexpected error occurred.';
-            setError(errorMessage);
-            setMessages(prev => [...prev, { role: 'assistant', content: `Sorry, I ran into an error: ${errorMessage}`, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+            const friendlyErrorMessage = parseErrorMessage(err);
+            setError(friendlyErrorMessage);
+            setMessages(prev => [...prev, { role: 'assistant', content: `I encountered a problem trying to generate the website. Here are the details:\n\n${friendlyErrorMessage}`, timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
         } finally {
             setIsLoading(false);
         }
-    }, [provider, activeApiKey, codeHistory, currentVersionIndex, userSupabaseUrl, userSupabaseAnonKey]);
+    }, [provider, activeApiKey, codeHistory, currentVersionIndex, userSupabaseUrl, userSupabaseAnonKey, user, generatedCode]);
 
     const handleRevert = (index: number) => {
         if (index >= 0 && index < codeHistory.length) {
@@ -217,12 +243,14 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
             --text: #18181b;
             --text-muted: #71717a;
             --border: #e4e4e7;
+            --primary: #3b82f6;
         }
         html.dark {
             --bg: #18181b;
             --text: #e4e4e7;
             --text-muted: #a1a1aa;
-            --border: #27272a;
+            --border: #2727a;
+            --primary: #60a5fa;
         }
         body {
             margin: 0;
@@ -256,11 +284,21 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
             padding: 1rem;
             border: 1px dashed var(--border);
             border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
         }
         .notice p {
             font-size: 0.875rem;
             color: var(--text-muted);
             margin: 0;
+        }
+        .notice svg {
+            width: 1.25rem;
+            height: 1.25rem;
+            color: var(--primary);
+            flex-shrink: 0;
         }
     </style>
 </head>
@@ -269,7 +307,16 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
         <h1>Welcome to Got Idea!</h1>
         <p>Your personal AI website generator. Describe the website you envision in the panel on the left, and watch it come to life right here.</p>
         <div class="notice">
-            <p>${activeApiKey ? 'Your API key is set. Ready to generate!' : 'To get started, please add your API key using the Settings icon above.'}</p>
+            ${!user ? `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            <p>Please <b>Sign In</b> using the button in the header to save your projects.</p>
+            ` : !activeApiKey ? `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+            <p>To get started, please add your API key in <b>Settings</b>.</p>
+            ` : `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L9 9l-7 3 7 3 3 7 3-7 7-3-7-3-3-7z"/></svg>
+            <p>You're all set! Ready to generate.</p>
+            `}
         </div>
     </div>
 </body>
@@ -278,12 +325,15 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
     
     return (
         <div className="flex-grow flex flex-col min-h-0">
-            {error && (<div className="flex-shrink-0 flex items-center justify-between p-3 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-b border-red-200 dark:border-red-800 z-10"><p className="text-sm">{error}</p><button onClick={() => setError(null)}><XIcon className="w-5 h-5"/></button></div>)}
+            {error && (<div className="flex-shrink-0 flex items-start justify-between p-3 bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 border-b border-red-200 dark:border-red-800 z-10">
+                <p className="text-sm whitespace-pre-wrap pr-4">{error}</p>
+                <button onClick={() => setError(null)} className="flex-shrink-0 pt-0.5"><XIcon className="w-5 h-5"/></button>
+            </div>)}
             <div className="flex-grow flex min-h-0">
                 <div className="w-full md:w-1/3 flex flex-col border-r border-[var(--gotidea-border)] bg-[var(--gotidea-bg-alt)]/80 relative">
                     <div className="flex-shrink-0 flex items-center justify-between p-2 border-b border-[var(--gotidea-border)] gap-2 flex-wrap">
                          <div className="flex items-center gap-2">
-                            <Button onClick={() => setIsNewProjectConfirmOpen(true)} className="flex items-center gap-2" title="Start a new project"><FilePlusIcon className="w-4 h-4" /> New</Button>
+                            <Button onClick={() => hasUnsavedChanges ? setIsNewProjectConfirmOpen(true) : handleStartNewProject()} disabled={!user} className="flex items-center gap-2" title="Start a new project"><FilePlusIcon className="w-4 h-4" /> New</Button>
                             {user && <Button onClick={() => setIsProjectsModalOpen(true)} className="flex items-center gap-2" title="My Projects"><CaseIcon className="w-4 h-4" /> Projects</Button>}
                          </div>
                          <div className="flex-grow flex items-center justify-center font-semibold text-sm text-[var(--gotidea-text-muted)] truncate px-2" title={activeProject?.name || "Untitled Project"}>
@@ -299,6 +349,17 @@ const Workspace: FC<WorkspaceProps> = ({ provider, activeApiKey, supabase, user,
                     </div>
 
                     {isHistoryOpen && <VersionHistoryPopover history={codeHistory} currentIndex={currentVersionIndex} onRevert={handleRevert} onClose={() => setIsHistoryOpen(false)} />}
+                    
+                    {!user && (
+                        <div className="absolute inset-0 z-20 bg-black/30 backdrop-blur-sm flex flex-col items-center justify-center text-center p-4">
+                            <div className="bg-[var(--gotidea-bg-alt)] p-8 rounded-lg shadow-lg border border-[var(--gotidea-border)]">
+                                <UserIcon className="w-12 h-12 mx-auto text-[var(--gotidea-text-muted)] mb-4" />
+                                <h3 className="font-bold text-lg">Sign In to Create</h3>
+                                <p className="text-sm text-[var(--gotidea-text-muted)] mt-2">Please sign in to start building and saving your projects.</p>
+                            </div>
+                        </div>
+                    )}
+
 
                     <div className="flex-grow flex flex-col min-h-0" >
                         <div className="p-4 flex-shrink-0 border-b border-[var(--gotidea-border)]">

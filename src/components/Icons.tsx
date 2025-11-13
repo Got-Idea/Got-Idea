@@ -44,6 +44,25 @@ export const GeminiIcon: FC<{ className?: string }> = ({ className }) => (
 export const CubeIcon: FC<{ className?: string }> = ({ className }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
 );
+export const OpenAiIcon: FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M20.65 14.35C20.2 17.2 18.2 19.65 16 20.95C14.7 21.75 13.25 22.1 11.8 22.1C8.75 22.1 6 20.7 4.25 18.25C3.35 17.1 2.8 15.8 2.5 14.35C2.15 12.8 2.15 11.2 2.5 9.75C2.8 8.3 3.35 7 4.25 5.85C6 3.4 8.75 2 11.8 2C13.25 2 14.7 2.35 16 3.15C18.2 4.45 20.2 6.9 20.65 9.75" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M15.4 13.4C15.15 15.1 14.2 16.55 12.7 17.5C11.9 18 11.05 18.25 10.15 18.25C8.1 18.25 6.45 17.25 5.4 15.6C5.05 15.05 4.8 14.4 4.65 13.7C4.5 13 4.5 12.25 4.65 11.55C4.8 10.85 5.05 10.2 5.4 9.6C6.45 8 8.1 7 10.15 7C11.05 7 11.9 7.2 12.7 7.65C14.2 8.6 15.15 10.1 15.4 11.8" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M8.25 12.05C8.25 13.5 7.8 14.8 6.95 15.75" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M12.2 17.1C11.6 17.3 10.9 17.4 10.15 17.4" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M16.9 8.3C16.1 7.8 15.2 7.4 14.25 7.15" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M7 8.35C7.2 7.75 7.55 7.2 8 6.75" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M18.8 12.05C18.8 10.5 19.25 9.15 20.1 8.2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+);
+export const RouterIcon: FC<{ className?: string }> = ({ className }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a10 10 0 1 0 10 10" />
+        <path d="M18 12h-5a2 2 0 0 0 -2 2v5" />
+        <path d="m13 15l3 3l-3 3" />
+        <path d="M6 12h5a2 2 0 0 1 2 2v5" />
+    </svg>
+);
 export const DatabaseIcon: FC<{ className?: string }> = ({ className }) => (
     <svg className={className} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
 );
