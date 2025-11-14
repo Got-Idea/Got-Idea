@@ -1,13 +1,6 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/drive/14olnnDjRjyHhogNkDG_qbngGWP_ZkIRs
-
+The website is publicly hosted for public use in the URL : https://got-idea.vercel.app/
+About 
+      Got Idea is an AI-driven website generation system designed to eliminate the technical barriers of traditional web development. By leveraging natural-language input and user-controlled API integration, the system can interpret user requirements, select suitable UI components, generate clean and responsive code, and assemble complete multi-page websites automatically. Users only need to provide their API key and a simple description of the website they want. GOT IDEA handles layout generation, styling, content structuring, and export packaging. The framework is highly modular, customizable, and capable of producing professional-quality websites within seconds, making it ideal for students, small businesses, startups, and anyone without coding expertise.
 ## Run Locally
 
 **Prerequisites:**  Node.js
