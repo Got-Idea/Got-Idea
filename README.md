@@ -6,7 +6,7 @@ The website is publicly hosted for public use in the URL : https://got-idea.verc
 About 
       
       
-      Got Idea is an AI-driven website generation system designed to eliminate the technical barriers of traditional web development. By leveraging natural-language input and user-controlled API integration, the system can interpret user requirements, select suitable UI components, generate clean and responsive code, and assemble complete multi-page websites automatically. Users only need to provide their API key and a simple description of the website they want. GOT IDEA handles layout generation, styling, content structuring, and export packaging. The framework is highly modular, customizable, and capable of producing professional-quality websites within seconds, making it ideal for students, small businesses, startups, and anyone without coding expertise.
+  Got Idea is an AI-driven website generation system designed to eliminate the technical barriers of traditional web development. By leveraging natural-language input and user-controlled API integration, the system can interpret user requirements, select suitable UI components, generate clean and responsive code, and assemble complete multi-page websites automatically. Users only need to provide their API key and a simple description of the website they want. GOT IDEA handles layout generation, styling, content structuring, and export packaging. The framework is highly modular, customizable, and capable of producing professional-quality websites within seconds, making it ideal for students, small businesses, startups, and anyone without coding expertise.
 
 
 
